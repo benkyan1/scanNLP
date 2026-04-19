@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DocuMind</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .upload-box {
+            border: 2px dashed #007bff;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #007bff;
+        }
+        .entity {
+            background: #e9ecef;
+            padding: 5px 10px;
+            margin: 5px;
+            display: inline-block;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+        .score {
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        hr {
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>📄 DocuMind</h1>
+    <p>Upload a document, then search by meaning.</p>
+
+    <div class="upload-box">
+        <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.pdf,.docx,.txt">
+        <br><br>
+        <button onclick="uploadFile()">Scan Document</button>
+    </div>
+
+    <div id="results" style="display:none;">
+        <h3>📋 What I found:</h3>
+        <div id="entities"></div>
+    </div>
+
+    <hr>
+
+    <h3>🔍 Semantic Search</h3>
+    <div>
+        <input type="text" id="searchInput" placeholder="Ask about your documents...">
+        <button onclick="searchDocs()">Search</button>
+    </div>
+    <div id="searchResults"></div>
+
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                displayEntities(data.data.entities);
+                document.getElementById('results').style.display = 'block';
+            } else {
+                alert('Error: ' + data.error);
+            }
+        }
+        
+        function displayEntities(entities) {
+            const container = document.getElementById('entities');
+            container.innerHTML = '';
+            
+            for (const [type, values] of Object.entries(entities)) {
+                if (values && values.length > 0) {
+                    const section = document.createElement('div');
+                    section.innerHTML = `<strong>${type.toUpperCase()}:</strong><br>`;
+                    
+                    values.forEach(value => {
+                        section.innerHTML += `<span class="entity">${value}</span>`;
+                    });
+                    
+                    container.appendChild(section);
+                }
+            }
+            
+            if (Object.keys(entities).length === 0) {
+                container.innerHTML = '<p>No specific entities found. Try uploading a document with emails, dates, or company names.</p>';
+            }
+        }
+        
+        async function searchDocs() {
+            const searchInput = document.getElementById('searchInput');
+            const query = searchInput.value;
+            
+            if (!query) {
+                alert('Enter a search query');
+                return;
+            }
+            
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({query: query})
+            });
+            
+            const data = await response.json();
+            
+            const container = document.getElementById('searchResults');
+            
+            if (data.results.length === 0) {
+                container.innerHTML = '<p>No matching documents found.</p>';
+                return;
+            }
+            
+            let html = '';
+            for (const result of data.results) {
+                html += `
+                    <div class="result">
+                        <strong>${result.filename}</strong>
+                        <span class="score">${result.score}% match</span>
+                        <div style="margin-top: 8px; color: #666;">
+                            ${result.text.substring(0, 200)}...
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
